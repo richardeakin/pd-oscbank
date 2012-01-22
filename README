@@ -1,0 +1,31 @@
+-----------------------------------------------------------------------------
+oscbank~: for additive synthesis
+-----------------------------------------------------------------------------
+
+This is a plugin (aka 'external') for Miller Pucketter's PureData
+("pd"). It was written in order to synthesize sinusoidal models that
+consist of hundreds of partial sinewave components.  The external takes three
+control-rate parameters for each partial: index(unique), frequency, and
+amplitude. It stores this information in a bank and synthesizes earch partial
+by interpolating between frames.  Please see the included oscbank~-help.pd for
+details.
+
+installation (from this directory):
+-----------------------------------------------------------------------------
+linux: make pd_linux
+mac: make pd_darwin
+windows: make pd_nt
+
+mac note: there is also an xcode project included, although it uses the same
+Makefile as for other platforms
+
+author:
+-----------------------------------------------------------------------------
+Richie Eakin < reakinator [at] gmail [dot] com
+with the kind help of Tom Erbe.
+
+history:
+-----------------------------------------------------------------------------
+10-15-2007 - v0.1
+- The code has been sitting around for a while with a bunch of bugs,
+  finally got around to fixing them all.  So here is the first version.
