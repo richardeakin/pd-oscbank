@@ -35,6 +35,8 @@ DARWIN_INCLUDE = -I /Applications/Pd-extended.app/Contents/Resources/include/
 	cc -arch i386 -bundle -undefined suppress -flat_namespace -o $*.pd_darwin $*.o
 	rm -f $*.o
 
+clean:
+	rm *.pd_darwin
 # ----------------------- NT -----------------------
 
 pd_nt: oscbank~.dll

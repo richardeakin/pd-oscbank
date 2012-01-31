@@ -7,18 +7,18 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		113B543114CB9D5C0006E9BB /* oscbank~-help.pd */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "oscbank~-help.pd"; sourceTree = "<group>"; };
-		113B543214CB9D5C0006E9BB /* oscbank~.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = "oscbank~.c"; sourceTree = "<group>"; };
-		113B543414CB9E2C0006E9BB /* Makefile */ = {isa = PBXFileReference; explicitFileType = sourcecode.make; fileEncoding = 4; path = Makefile; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.sh; };
+		1108BCBB14D7EAAD00A64F48 /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; name = Makefile; path = src/Makefile; sourceTree = "<group>"; };
+		1108BCBC14D7ED7500A64F48 /* oscbank~-help.pd */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = "oscbank~-help.pd"; path = "src/oscbank~-help.pd"; sourceTree = "<group>"; };
+		113B543214CB9D5C0006E9BB /* oscbank~.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = "oscbank~.c"; path = "src/oscbank~.c"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		113B542114CB9D060006E9BB = {
 			isa = PBXGroup;
 			children = (
-				113B543414CB9E2C0006E9BB /* Makefile */,
+				1108BCBB14D7EAAD00A64F48 /* Makefile */,
 				113B543214CB9D5C0006E9BB /* oscbank~.c */,
-				113B543114CB9D5C0006E9BB /* oscbank~-help.pd */,
+				1108BCBC14D7ED7500A64F48 /* oscbank~-help.pd */,
 			);
 			sourceTree = "<group>";
 		};
@@ -32,7 +32,7 @@
 			buildPhases = (
 			);
 			buildToolPath = /usr/bin/make;
-			buildWorkingDirectory = "";
+			buildWorkingDirectory = src;
 			dependencies = (
 			);
 			name = "oscbank~";
