@@ -1,8 +1,11 @@
+# ----------------------- shared settings
+
+SHARED_CFLAGS = -g -DPD -g -DPD -Wall -W -Wshadow -Wstrict-prototypes \
+    -Wno-unused -Wno-parentheses -Wno-switch
+
 # ----------------------- LINUX i386 -----------------------
 
 pd_linux: oscbank~.pd_linux
-
-
 
 .SUFFIXES: .pd_linux
 
@@ -25,8 +28,7 @@ pd_darwin: oscbank~.pd_darwin
 
 .SUFFIXES: .pd_darwin
 
-DARWINCFLAGS = -g -DPD -Wall -W -Wshadow -Wstrict-prototypes \
-    -Wno-unused -Wno-parentheses -Wno-switch
+DARWINCFLAGS = #(SHARED_CFLAGS)
 
 DARWIN_INCLUDE = -I /Applications/Pd-extended.app/Contents/Resources/include/
 
