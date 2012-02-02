@@ -16,7 +16,8 @@
 
 #define WAVETABLESIZE 65536 // 2^16
 #define DEFAULT_NPARTIALS 100
-#define DEFAULT_interp_incr 0.0045 // per sample, this is 20 ms @ 44k sr 
+#define DEFAULT_interp_incr 0.0045 // per sample, this is 20 ms @ 44k sr
+#define NEAR_ZERO 0.0000001
 
 typedef struct _partial
 {
@@ -44,7 +45,6 @@ typedef struct _oscbank
     float    sampleperiod; 
     float    interp_incr;
     long     interpSamples;
-    int      sp;
     int      nPartials;
 } t_oscbank;
 
@@ -92,7 +92,6 @@ static void *oscbank_new(void)
     oscbank_interpMs( x, 20.0f); 
 	
     x->got_a_table = 0;
-    x->sp = 0;
     x->nPartials = DEFAULT_NPARTIALS;
     x->pBank = (t_partial *)getbytes( x->nPartials * sizeof(t_partial));
     memset(x->pBank, 0, x->nPartials * sizeof(t_partial));
@@ -147,19 +146,20 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 {
 	int i, iindex;
 	iindex = (int)in;
-	t_partial *bank = x->pBank; 
+	t_partial *bank = x->pBank;
+	int empty_index = -1;
+	int quietest_index = 0;
 	
 	if( iindex < 0)	{
-	    error("negative index rejected");
+	    error("oscbank~ needs a positive index.");
 	    return;
 	}
 	
-	//TODO: find open index in first loop, use that instead of second loop
-	//check if continuing partial
+	//check if it is continuing partial
 	//recaluclate increment slope from current interpolated positions and update goal
-	for(i =0; i < x->nPartials; i++) {
-		if( bank[i].index == iindex) {
-			if(bank[i].aCurr == 0) bank[i].aCurr = 0.0000001;
+	for(i = 0; i < x->nPartials; i++) {
+		if(bank[i].index == iindex) {
+			if(bank[i].aCurr == 0) bank[i].aCurr = NEAR_ZERO;
 			bank[i].fIncr = (x->infreq - bank[i].fCurr) * x->interp_incr;
 			bank[i].aIncr = (x->inamp - bank[i].aCurr) * x->interp_incr;
 			bank[i].freq = x->infreq;
@@ -167,39 +167,37 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 			bank[i].nInterp = x->interpSamples;
 			return;
 		}
-	}
-	
-	//new partial, see if there is an empty slot for the new partial
-	for(i =0; i < x->nPartials; i++)
-	{
-		if(bank[i].aCurr == 0) { 
-			//ramp amp from zero
-			bank[i].index = iindex;
-			bank[i].fCurr = x->infreq;
-			bank[i].fIncr = 0;
-			bank[i].freq = x->infreq;
-			bank[i].amp = x->inamp;
-			bank[i].nInterp = x->interpSamples;
-			bank[i].aCurr = 0.0000001;  
-			bank[i].aIncr = x->inamp * x->interp_incr;
-			return;
+		// store indeces either for an empty partial or quietest
+		if(empty_index < 0 && bank[i].aCurr < NEAR_ZERO) {
+			empty_index = i;
+		}
+		if(bank[i].amp < bank[quietest_index].amp) {
+			quietest_index = i;
 		}
 	}
-	
-	// FIXME: Creates a pop. could take the quietest instead
-	//oscbank is full, steal oldest partial and ramp amp from zero
-	bank[x->sp].index = iindex;
-	bank[x->sp].fCurr = x->infreq;
-	bank[x->sp].fIncr = 0;
-	bank[x->sp].freq = x->infreq;
-	bank[x->sp].amp = x->inamp;
-	bank[x->sp].nInterp = x->interpSamples;
-	bank[x->sp].aCurr = 0.0000001;
-	bank[x->sp].aIncr = x->inamp * x->interp_incr; 
-	x->sp++;
-	if(x->sp == x->nPartials) {
-		x->sp = 0;	
+
+	if(empty_index >= 0) {
+		//ramp amp from zero
+		bank[empty_index].index = iindex;
+		bank[empty_index].fCurr = x->infreq;
+		bank[empty_index].fIncr = 0;
+		bank[empty_index].freq = x->infreq;
+		bank[empty_index].amp = x->inamp;
+		bank[empty_index].nInterp = x->interpSamples;
+		bank[empty_index].aCurr = NEAR_ZERO;  
+		bank[empty_index].aIncr = x->inamp * x->interp_incr;
+		return;
 	}
+	
+	//oscbank is full, steal quietest partial and ramp amp from zero
+	bank[quietest_index].index = iindex;
+	bank[quietest_index].fCurr = x->infreq;
+	bank[quietest_index].fIncr = 0;
+	bank[quietest_index].freq = x->infreq;
+	bank[quietest_index].amp = x->inamp;
+	bank[quietest_index].nInterp = x->interpSamples;
+	bank[quietest_index].aCurr = NEAR_ZERO;
+	bank[quietest_index].aIncr = x->inamp * x->interp_incr; 
 }
 
 static void oscbank_table(t_oscbank *x, t_symbol *tablename)
@@ -251,7 +249,7 @@ static t_int *oscbank_perform(t_int *w)
     t_int	lookup;
     t_partial *bank = x->pBank; 
 	
-    memset( out, 0, n *sizeof( t_float ));
+    memset(out, 0, n *sizeof( t_float ));
 	
     for(i=0; i < x->nPartials; i++) {
 		if(bank[i].aCurr != 0) {
