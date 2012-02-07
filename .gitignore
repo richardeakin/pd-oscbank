@@ -1,1 +1,3 @@
 oscbank~.pd_darwin
+oscbank~.pd_linux
+oscbank~.dll
