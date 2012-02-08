@@ -1,4 +1,4 @@
-// ------------------------ oscbank~ 0.1 -----------------------------
+// ------------------------ oscbank~ 0.2 -----------------------------
 // oscillator bank using 3 seperate float inlets with interpolation
 // - Please see the included README and LICENSE for more info
 // - reakinator@gmail.com
@@ -56,6 +56,7 @@ static void oscbank_nPartials(t_oscbank *x, t_floatarg n);
 static void oscbank_index(t_oscbank *x, t_floatarg in);
 static void oscbank_table(t_oscbank *x, t_symbol *tablename);
 static void oscbank_print(t_oscbank *x);
+static void oscbank_outlist(t_oscbank *x);
 static void oscbank_dsp(t_oscbank *x, t_signal **sp);
 static void oscbank_reset(t_oscbank *x);
 
@@ -70,6 +71,7 @@ void oscbank_tilde_setup(void)
     class_addmethod(oscbank_class, (t_method)oscbank_interpMs, gensym("interp"), A_FLOAT, 0);
     class_addmethod(oscbank_class, (t_method)oscbank_dsp, gensym("dsp"), (t_atomtype)0);
     class_addmethod(oscbank_class, (t_method)oscbank_print, gensym("print"), 0);
+    class_addmethod(oscbank_class, (t_method)oscbank_outlist, gensym("sendout"), 0);
     class_addmethod(oscbank_class, (t_method)oscbank_reset, gensym("reset"), 0);
     class_addmethod(oscbank_class, (t_method)oscbank_nPartials, gensym("partials"), A_FLOAT, 0);
 }
@@ -82,6 +84,8 @@ static void *oscbank_new(void)
     int i;
 	
     outlet_new(&x->x_obj, gensym("signal"));
+	outlet_new(&x->x_obj, gensym("list"));	
+	
     floatinlet_new(&x->x_obj, &x->infreq);
     floatinlet_new(&x->x_obj, &x->inamp);
     inlet_new(&x->x_obj, &x->x_obj.ob_pd, gensym("float"), gensym("interp"));
@@ -220,15 +224,39 @@ static void oscbank_table(t_oscbank *x, t_symbol *tablename)
 
 static void oscbank_print(t_oscbank *x)
 {
-    t_partial *bank = x->pBank; 
-    post("#.  Index,  Freq,  Amp");
+    t_partial *bank = x->pBank;
+    post("#:  Index,  Freq,  Amp");
 
 	int i;
     for(i = 0; i < x->nPartials; i++) {
 		if(bank[i].aCurr) {
-			post("%d. index: %d,freq: %f,amp: %f", i, bank[i].index, bank[i].freq,  bank[i].amp );
+			post("%d: %d, %f, %f", i, bank[i].index, bank[i].freq,  bank[i].amp );
 		}
     }
+}
+
+static void oscbank_outlist(t_oscbank *x)
+{
+    t_partial *bank = x->pBank;
+	t_atom *outv;
+	int audiblePartials = 0;
+	outv = (t_atom *)malloc(x->nPartials * 3 * sizeof(t_atom));
+	if(!outv) {
+		pd_error(x, "could not allocate memory for t_atom list");
+		return;
+	}
+
+	int i, offset;
+    for(i = 0; i < x->nPartials; i++) {
+		if(bank[i].aCurr) {
+			offset = audiblePartials++ * 3;
+			SETFLOAT(outv + offset, (float)bank[i].index);
+			SETFLOAT(outv + offset + 1, bank[i].freq);
+			SETFLOAT(outv + offset + 2, bank[i].amp);
+		}
+    }
+	outlet_list(x->list_outlet, &s_list, audiblePartials * 3, outv); // only send out atoms that are filled
+	free(outv);
 }
 
 static void oscbank_reset(t_oscbank *x)

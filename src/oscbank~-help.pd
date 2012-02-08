@@ -266,10 +266,12 @@ list;
 #X text 327 365 - 1000 partials uses 57% cpu on my Core 2 Duo laptop
 ;
 #X text 340 378 running Ubuntu!;
-#X text 128 14 version 0.1;
 #X text 13 117 can handle:;
 #X text 381 266 specify the wavetable for oscbank~ to use;
+#X obj 209 481 print partials;
+#X text 127 14 version 0.2 (2012/02/08);
 #X connect 0 0 1 0;
+#X connect 0 1 55 0;
 #X connect 2 0 0 3;
 #X connect 7 0 0 0;
 #X connect 8 0 0 0;
