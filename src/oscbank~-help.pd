@@ -1,4 +1,4 @@
-#N canvas 298 161 751 538 10;
+#N canvas 792 200 751 538 10;
 #X obj 131 451 oscbank~;
 #N canvas 0 22 220 207 output 0;
 #X obj 43 260 dac~;
@@ -22,21 +22,21 @@
 #X text 355 416 1 index (integer <= 0);
 #X text 355 430 2 frequency (hz.);
 #X text 355 443 3 amplitude (rms );
-#X msg 243 165 1 440 0.7;
-#X msg 243 193 1 50 0;
-#X text 309 173 sometimes less of a hassle to list one partial as a
+#X msg 243 125 1 440 0.7;
+#X msg 243 153 1 50 0;
+#X text 309 133 sometimes less of a hassle to list one partial as a
 list;
-#X text 309 185 if done using all the float inlets \, only the leftmost
+#X text 309 145 if done using all the float inlets \, only the leftmost
 ;
-#X text 308 198 inlet updates the partial at the specified index;
+#X text 308 158 inlet updates the partial at the specified index;
 #X text 355 456 4 interpolation time (msec.);
 #X text 382 468 - default is 20ms @ 44.1k SR;
-#X msg 244 221 print;
-#X text 284 220 prints all partials in the bank;
+#X msg 244 181 print;
+#X text 284 180 prints all partials in the bank;
 #X msg 244 242 reset;
 #X text 279 241 clears everything in the bank to zero;
 #X msg 244 267 table OscbankWaveform;
-#X text 310 161 One partial;
+#X text 310 121 One partial;
 #N canvas 70 547 936 270 theTable 0;
 #X text 13 40 it would be better to avoid interpolation on a few;
 #X text 13 55 hundred partials and just use a gigantic table that;
@@ -220,12 +220,12 @@ list;
 #X connect 16 0 15 0;
 #X connect 17 0 18 0;
 #X restore 14 205 pd random;
-#X obj 14 177 tgl 15 0 empty empty empty 0 -6 0 8 -262144 -1 -1 0 1
+#X obj 14 177 tgl 15 0 empty empty empty 0 -6 0 8 -262144 -1 -1 1 1
 ;
 #X floatatom 32 147 5 0 0 2 interval(ms) rand-interval -;
 #X floatatom 78 160 5 0 0 2 bandwidth(hz) rand-bandwidth -;
 #X floatatom 79 187 5 0 0 2 minimum(hz) rand-min -;
-#X text 239 140 Messages to first inlet:;
+#X text 239 100 Messages to first inlet:;
 #X text 11 104 test how many your system;
 #X floatatom 14 255 5 0 0 0 - - -;
 #N canvas 0 22 474 324 blur 0;
@@ -268,10 +268,12 @@ list;
 #X text 340 378 running Ubuntu!;
 #X text 13 117 can handle:;
 #X text 381 266 specify the wavetable for oscbank~ to use;
-#X obj 209 481 print partials;
 #X text 127 14 version 0.2 (2012/02/08);
+#X msg 245 210 sendout;
+#X obj 209 481 print partials;
+#X text 297 210 outputs a list of all partials in the bank;
 #X connect 0 0 1 0;
-#X connect 0 1 55 0;
+#X connect 0 1 57 0;
 #X connect 2 0 0 3;
 #X connect 7 0 0 0;
 #X connect 8 0 0 0;
@@ -292,3 +294,4 @@ list;
 #X connect 39 0 0 0;
 #X connect 40 0 38 0;
 #X connect 50 0 0 0;
+#X connect 56 0 0 0;
