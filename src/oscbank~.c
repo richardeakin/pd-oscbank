@@ -19,17 +19,18 @@
 #define DEFAULT_interp_incr 0.0045 // per sample, this is 20 ms @ 44k sr
 #define NEAR_ZERO 0.0000001
 
+// t_partial represents one oscillator (partial) in the bank
 typedef struct _partial
 {
 	int   index;
-	float fCurr;
-	float freq;
-	float fIncr;
+	float fCurr; // current freq / amp (sample level)
 	float aCurr;
+	float freq;  // target freq / amp
 	float amp;
+	float fIncr; // amount freq / amp to increment per sample
 	float aIncr;
-	float phase;
-	unsigned long  nInterp;
+	float phase; // stored phase
+	unsigned long  nInterp; // number of samples left for interpolation (0 = target reached)
 } t_partial;
 
 typedef struct _oscbank
@@ -61,6 +62,7 @@ static void oscbank_outlist(t_oscbank *x);
 static void oscbank_dsp(t_oscbank *x, t_signal **sp);
 static void oscbank_reset(t_oscbank *x);
 
+static void reset_partials(t_oscbank *x, int start, int size);
 // ------------------- Setup / Teardown ------------------------------
 
 void oscbank_tilde_setup(void)
@@ -99,15 +101,15 @@ static void *oscbank_new(void)
 	x->got_a_table = 0;
 	x->nPartials = DEFAULT_NPARTIALS;
 	x->pBank = (t_partial *)getbytes( x->nPartials * sizeof(t_partial));
-	memset(x->pBank, 0, x->nPartials * sizeof(t_partial));
+	reset_partials(x, 0, x->nPartials);
 
 	twopi = 8.0f * atan(1.0f);
 	x->wavetablesize = WAVETABLESIZE;
 	float *sinewave;
 	sinewave = (t_float *)malloc(x->wavetablesize * sizeof(t_float));
-	for(i = 0; i < x->wavetablesize; i++)
+	for(i = 0; i < x->wavetablesize; i++) {
 		sinewave[i] = sin(twopi * (float)i/ x->wavetablesize);
-
+	}
 	x->wavetable = &sinewave[0];
 
 	return (x);
@@ -142,7 +144,10 @@ static void oscbank_interpMs(t_oscbank *x, t_floatarg n)
 
 static void oscbank_nPartials(t_oscbank *x, t_floatarg n)
 {
-	x->pBank = (t_partial *)resizebytes( x->pBank, x->nPartials * sizeof(t_partial), n * sizeof(t_partial));
+	x->pBank = (t_partial *)resizebytes(x->pBank, x->nPartials * sizeof(t_partial), n * sizeof(t_partial));
+	if (n > x->nPartials) {
+		reset_partials(x, x->nPartials, n - x->nPartials);
+	}
 	x->nPartials = n;
 	post("max partials: %d", x->nPartials);
 }
@@ -164,7 +169,9 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 	//recaluclate increment slope from current interpolated positions and update goal
 	for(i = 0; i < x->nPartials; i++) {
 		if(bank[i].index == iindex) {
-			if(bank[i].aCurr == 0) bank[i].aCurr = NEAR_ZERO;
+			if(bank[i].aCurr == 0) {
+				bank[i].aCurr = NEAR_ZERO;
+			}
 			bank[i].fIncr = (x->infreq - bank[i].fCurr) * x->interp_incr;
 			bank[i].aIncr = (x->inamp - bank[i].aCurr) * x->interp_incr;
 			bank[i].freq = x->infreq;
@@ -172,10 +179,11 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 			bank[i].nInterp = x->interpSamples;
 			return;
 		}
-		// store indeces either for an empty partial or quietest
+		// store index for first empty
 		if(empty_index < 0 && bank[i].aCurr < NEAR_ZERO) {
 			empty_index = i;
 		}
+		// store index for quietest partial
 		if(bank[i].amp < bank[quietest_index].amp) {
 			quietest_index = i;
 		}
@@ -184,11 +192,11 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 	if(empty_index >= 0) {
 		//ramp amp from zero
 		bank[empty_index].index = iindex;
-		bank[empty_index].fCurr = x->infreq;
+		bank[empty_index].nInterp = x->interpSamples;
 		bank[empty_index].fIncr = 0;
 		bank[empty_index].freq = x->infreq;
+		bank[empty_index].fCurr = x->infreq;
 		bank[empty_index].amp = x->inamp;
-		bank[empty_index].nInterp = x->interpSamples;
 		bank[empty_index].aCurr = NEAR_ZERO;  
 		bank[empty_index].aIncr = x->inamp * x->interp_incr;
 		return;
@@ -196,11 +204,11 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 
 	//oscbank is full, steal quietest partial and ramp amp from zero
 	bank[quietest_index].index = iindex;
-	bank[quietest_index].fCurr = x->infreq;
+	bank[quietest_index].nInterp = x->interpSamples;
 	bank[quietest_index].fIncr = 0;
 	bank[quietest_index].freq = x->infreq;
+	bank[quietest_index].fCurr = x->infreq;
 	bank[quietest_index].amp = x->inamp;
-	bank[quietest_index].nInterp = x->interpSamples;
 	bank[quietest_index].aCurr = NEAR_ZERO;
 	bank[quietest_index].aIncr = x->inamp * x->interp_incr; 
 }
@@ -231,7 +239,7 @@ static void oscbank_print(t_oscbank *x)
 	int i;
 	for(i = 0; i < x->nPartials; i++) {
 		if(bank[i].aCurr) {
-			post("%d: %d, %.2f, %.2f", i, bank[i].index, bank[i].freq,  bank[i].amp );
+			post("%d: %d, %.2f, %.2f", i, bank[i].index, bank[i].fCurr,  bank[i].aCurr );
 		}
 	}
 }
@@ -252,8 +260,8 @@ static void oscbank_outlist(t_oscbank *x)
 		if(bank[i].aCurr) {
 			offset = audiblePartials++ * 3;
 			SETFLOAT(outv + offset, (float)bank[i].index);
-			SETFLOAT(outv + offset + 1, bank[i].freq);
-			SETFLOAT(outv + offset + 2, bank[i].amp);
+			SETFLOAT(outv + offset + 1, bank[i].fCurr);
+			SETFLOAT(outv + offset + 2, bank[i].aCurr);
 		}
 	}
 	outlet_list(x->list_outlet, &s_list, audiblePartials * 3, outv); // only send out atoms that are filled
@@ -315,3 +323,14 @@ static void oscbank_dsp(t_oscbank *x, t_signal **sp)
 	x->sampleperiod = 1 / x->sampleRate;
 	dsp_add(oscbank_perform, 3, x, sp[0]->s_vec, sp[0]->s_n);
 }
+
+//------------------------- Private routines ---------------------------------------
+
+static void reset_partials(t_oscbank *x, int start, int size)
+{
+	memset((t_partial *)(x->pBank + start), 0, size * sizeof(t_partial) );
+	for (int i = 0; i < size; i++) {
+		x->pBank[start + i].index = -1; // invalidate
+	}
+}
+
