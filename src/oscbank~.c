@@ -171,6 +171,7 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 	iindex = (int)in;
 	int empty_index = -1;
 	int quietest_index = 0;
+	float freq = fabsf(x->infreq);
 
 	if( iindex < 0)	{
 		error("oscbank~ needs a positive index.");
@@ -185,9 +186,9 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 			if(partial->aCurr == 0) {
 				partial->aCurr = NEAR_ZERO;
 			}
-			partial->fIncr = (x->infreq - partial->fCurr) * x->interp_incr;
+			partial->fIncr = (freq - partial->fCurr) * x->interp_incr;
 			partial->aIncr = (x->inamp - partial->aCurr) * x->interp_incr;
-			partial->freq = x->infreq;
+			partial->freq = freq;
 			partial->amp = x->inamp;
 			partial->nInterp = x->interpSamples;
 			return;
@@ -208,8 +209,8 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 		partial->index = iindex;
 		partial->nInterp = x->interpSamples;
 		partial->fIncr = 0;
-		partial->freq = x->infreq;
-		partial->fCurr = x->infreq;
+		partial->freq = freq;
+		partial->fCurr = freq;
 		partial->amp = x->inamp;
 		partial->aCurr = NEAR_ZERO;
 		partial->aIncr = x->inamp * x->interp_incr;
@@ -221,8 +222,8 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 	partial->index = iindex;
 	partial->nInterp = x->interpSamples;
 	partial->fIncr = 0;
-	partial->freq = x->infreq;
-	partial->fCurr = x->infreq;
+	partial->freq = freq;
+	partial->fCurr = freq;
 	partial->amp = x->inamp;
 	partial->aCurr = NEAR_ZERO;
 	partial->aIncr = x->inamp * x->interp_incr;
@@ -327,11 +328,8 @@ static t_int *oscbank_perform(t_int *w)
 				// sr = samp/sec, phaseinc = cyc/samp = freq/sr = freq * sampleperiod
 				phaseincrement = partial->fCurr * x->sampleperiod;
 				partial->phase += phaseincrement;
-				while(partial->phase >= 1.0f) {
-					partial->phase -= 1.0f;
-				}
-				while(partial->phase < 0.0f) {
-					partial->phase += 1.0f;
+				if(partial->phase >= 1.0f) {
+					partial->phase = fmodf(partial->phase, 1.0f);
 				}
 				
 #if defined (WAVETABLE_INTERP)
