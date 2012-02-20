@@ -3,6 +3,9 @@
 SHARED_CFLAGS = -g -DPD -g -DPD -Wall -W -Wshadow -Wstrict-prototypes \
     -Wno-unused -Wno-parentheses -Wno-switch
 
+# uncomment for linear wavetable interpolation
+SHARED_CFLAGS += -DWAVETABLE_INTERP
+
 # ----------------------- LINUX i386 -----------------------
 
 pd_linux: oscbank~.pd_linux

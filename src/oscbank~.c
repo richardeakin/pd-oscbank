@@ -9,11 +9,6 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef NT
-#pragma warning( disable : 4244 )
-#define inline
-#endif
-
 #define WAVETABLESIZE 65536 // 2^16
 #define DEFAULT_NPARTIALS 100
 #define DEFAULT_interp_incr 0.0045 // per sample, this is 20 ms @ 44k sr
@@ -63,6 +58,16 @@ static void oscbank_dsp(t_oscbank *x, t_signal **sp);
 static void oscbank_reset(t_oscbank *x);
 
 static void resize_partials(t_oscbank *x, int old, int new);
+
+inline static float wavetable_interp(float *wavetable, float lookup)
+{
+	float frac, integral, f1, f2;
+	frac = modff(lookup, &integral);
+	wavetable += (int)integral;
+	f1 = wavetable[0];
+	f2 = wavetable[1];
+	return f1 + frac * (f2 - f1);
+}
 
 // ------------------- Setup / Teardown ------------------------------
 
@@ -295,8 +300,13 @@ static t_int *oscbank_perform(t_int *w)
 	t_int n = (t_int)(w[3]);
 	t_int i, sample;
 	t_float phaseincrement;
+	
+#if defined (WAVETABLE_INTERP)
 	t_int lookup;
-
+#else
+	t_float lookup;
+#endif
+	
 	memset(out, 0, n * sizeof(t_float));
 
 	for(i = 0; i < x->nPartials; i++) {
@@ -322,8 +332,15 @@ static t_int *oscbank_perform(t_int *w)
 				while(partial->phase < 0.0f) {
 					partial->phase += 1.0f;
 				}
+				
+#if defined (WAVETABLE_INTERP)
+				lookup = (float)x->wavetablesize * partial->phase;
+				*(out+sample) += wavetable_interp(x->wavetable, lookup) * partial->aCurr;
+#else				
 				lookup = (int)(x->wavetablesize * partial->phase);
 				*(out+sample) += *(x->wavetable + lookup) * partial->aCurr;
+#endif
+				
 			}
 		}
 	}
