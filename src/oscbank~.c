@@ -9,10 +9,11 @@
 #include <string.h>
 #include <math.h>
 
-#define WAVETABLESIZE 65536 // 2^16
+#define DEFAULT_WAVETABLESIZE 65536 // 2^16
 #define DEFAULT_NPARTIALS 100
-#define DEFAULT_interp_incr 0.0045 // per sample, this is 20 ms @ 44k sr
-#define NEAR_ZERO 0.0000001
+#define DEFAULT_SAMPLERATE 44100
+#define DEFAULT_INTERP_MS 20.0f
+#define NEAR_ZERO 0.0000001f
 
 // t_partial represents one oscillator (partial) in the bank
 typedef struct _partial
@@ -100,9 +101,9 @@ static void *oscbank_new(void)
 	inlet_new(&x->x_obj, &x->x_obj.ob_pd, gensym("float"), gensym("interp"));
 
 	// hardcoded samplerate prevents divide by zero in oscbank_index(), but will be updated when dsp is switched on
-	x->sampleRate = 44100;
+	x->sampleRate = DEFAULT_SAMPLERATE;
 	x->sampleperiod = 1.0f / x->sampleRate;
-	oscbank_interpMs( x, 20.0f);
+	oscbank_interpMs( x, DEFAULT_INTERP_MS);
 
 	x->got_a_table = 0;
 	x->nPartials = DEFAULT_NPARTIALS;
@@ -110,7 +111,7 @@ static void *oscbank_new(void)
 	resize_partials(x, 0, x->nPartials);
 
 	twopi = 8.0f * atan(1.0f);
-	x->wavetablesize = WAVETABLESIZE;
+	x->wavetablesize = DEFAULT_WAVETABLESIZE;
 	float *sinewave;
 	sinewave = (t_float *)malloc(x->wavetablesize * sizeof(t_float));
 	for(i = 0; i < x->wavetablesize; i++) {
@@ -311,7 +312,7 @@ static t_int *oscbank_perform(t_int *w)
 
 	for(i = 0; i < x->nPartials; i++) {
 		t_partial *partial = x->pBank[i];
-		if(partial->aCurr != 0) { // TODO: should be > NEAR_ZERO
+		if(partial->amp > NEAR_ZERO) {
 			for(sample = 0; sample < n; sample++) {
 				if(partial->nInterp > 0) {
 					partial->fCurr += partial->fIncr;
