@@ -303,11 +303,8 @@ static t_int *oscbank_perform(t_int *w)
 	t_int i, sample;
 	t_float phaseincrement;
 	
-#if defined (WAVETABLE_INTERP)
-	t_int lookup;
-#else
-	t_float lookup;
-#endif
+	t_int wavetable_mul = x->wavetablesize - 1;
+	t_float *wavetable = x->wavetable;
 	
 	memset(out, 0, n * sizeof(t_float));
 
@@ -333,13 +330,10 @@ static t_int *oscbank_perform(t_int *w)
 				}
 				
 #if defined (WAVETABLE_INTERP)
-				lookup = (float)x->wavetablesize * partial->phase;
-				*(out+sample) += wavetable_interp(x->wavetable, lookup) * partial->aCurr;
+				*(out+sample) += wavetable_interp(wavetable, wavetable_mul * partial->phase) * partial->aCurr;
 #else				
-				lookup = (int)(x->wavetablesize * partial->phase);
-				*(out+sample) += *(x->wavetable + lookup) * partial->aCurr;
+				*(out+sample) += *(wavetable + (wavetable_mul * (int)partial->phase)) * partial->aCurr;
 #endif
-				
 			}
 		}
 	}
