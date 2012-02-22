@@ -34,6 +34,7 @@ typedef struct _oscbank
 	t_object x_obj;
 	t_outlet *list_outlet;
 	t_partial **pBank;
+	t_atom   *outv;
 	float    *wavetable;
 	int      wavetablesize;
 	int      got_a_table;
@@ -108,6 +109,7 @@ static void *oscbank_new(void)
 	x->got_a_table = 0;
 	x->nPartials = DEFAULT_NPARTIALS;
 	x->pBank = NULL;
+	x->outv = NULL;
 	resize_partials(x, 0, x->nPartials);
 
 	twopi = 8.0f * atan(1.0f);
@@ -129,6 +131,10 @@ static void oscbank_free(t_oscbank *x)
 		free(x->pBank[i]);
 	}
 	free(x->pBank);
+	
+	if (x->outv) {
+		free(x->outv);
+	}
 	
 	if(!x->got_a_table) {
 		free(x->wavetable);
@@ -262,10 +268,12 @@ static void oscbank_print(t_oscbank *x)
 
 static void oscbank_outlist(t_oscbank *x)
 {
-	t_atom *outv;
 	int audiblePartials = 0;
-	outv = (t_atom *)malloc(x->nPartials * 3 * sizeof(t_atom));
-	if(!outv) {
+	if (!x->outv) {
+		x->outv = (t_atom *)malloc(x->nPartials * 3 * sizeof(t_atom));
+		post("sendout: allocated %d bytes", x->nPartials * 3 * sizeof(t_atom));
+	}
+	if(!x->outv) {
 		pd_error(x, "could not allocate memory for t_atom list");
 		return;
 	}
@@ -275,13 +283,12 @@ static void oscbank_outlist(t_oscbank *x)
 		t_partial *partial = x->pBank[i];
 		if(partial->aCurr) {
 			offset = audiblePartials++ * 3;
-			SETFLOAT(outv + offset, (float)partial->index);
-			SETFLOAT(outv + offset + 1, partial->fCurr);
-			SETFLOAT(outv + offset + 2, partial->aCurr);
+			SETFLOAT(x->outv + offset, (float)partial->index);
+			SETFLOAT(x->outv + offset + 1, partial->fCurr);
+			SETFLOAT(x->outv + offset + 2, partial->aCurr);
 		}
 	}
-	outlet_list(x->list_outlet, &s_list, audiblePartials * 3, outv); // only send out atoms that are filled
-	free(outv);
+	outlet_list(x->list_outlet, &s_list, audiblePartials * 3, x->outv); // only send out atoms that are filled
 }
 
 static void oscbank_reset(t_oscbank *x)
@@ -359,10 +366,15 @@ static void resize_partials(t_oscbank *x, int old, int new)
 			x->pBank[i]->index = -1; // invalidate
 		}
 	} else if (new < old) {
-		for (i = old; i >= new; i--) {
+		for (i = new; i < old; i++) {
 			free(x->pBank[i]);
-			// TODO: free t_partial pointers
+			// extra memory in x->pBank will be freed in oscbank_free()
 		}
+	}
+	
+	if (x->outv) {
+		free(x->outv);
+		x->outv = NULL;
 	}
 }
 
