@@ -1,10 +1,11 @@
 # ----------------------- shared settings
 
-SHARED_CFLAGS = -g -DPD -g -DPD -Wall -W -Wshadow -Wstrict-prototypes \
-    -Wno-unused -Wno-parentheses -Wno-switch
+SHARED_CFLAGS = -g -DPD -Wall -O0
 
 # uncomment for linear wavetable interpolation
 SHARED_CFLAGS += -DWAVETABLE_INTERP
+
+COMPILER = gcc
 
 # ----------------------- LINUX i386 -----------------------
 
@@ -19,7 +20,7 @@ LINUXCFLAGS = -DPD -O2 -funroll-loops -fomit-frame-pointer \
 LINUXINCLUDE =  -I /usr/local/src/pd
 
 .c.pd_linux:
-	cc $(LINUXCFLAGS) $(LINUXINCLUDE) -o $*.o -c $*.c
+	$(COMPILER) $(LINUXCFLAGS) $(LINUXINCLUDE) -o $*.o -c $*.c
 	ld --export-dynamic  -shared -o $*.pd_linux $*.o -lc -lm 
 	strip --strip-unneeded $*.pd_linux
 	rm $*.o
@@ -31,13 +32,13 @@ pd_darwin: oscbank~.pd_darwin
 
 .SUFFIXES: .pd_darwin
 
-DARWINCFLAGS = #(SHARED_CFLAGS)
+DARWINCFLAGS = $(SHARED_CFLAGS)
 
 DARWIN_INCLUDE = -I /Applications/Pd-extended.app/Contents/Resources/include/
 
 .c.pd_darwin:
-	cc -arch i386 $(DARWINCFLAGS) $(DARWIN_INCLUDE) -o $*.o -c $*.c
-	cc -arch i386 -bundle -undefined suppress -flat_namespace -o $*.pd_darwin $*.o
+	$(COMPILER) -arch i386 $(DARWINCFLAGS) $(DARWIN_INCLUDE) -o $*.o -c $*.c
+	$(COMPILER) -arch i386 -bundle -undefined suppress -flat_namespace -o $*.pd_darwin $*.o
 	rm -f $*.o
 
 clean:
