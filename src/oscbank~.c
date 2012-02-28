@@ -53,6 +53,7 @@ static void oscbank_free(t_oscbank *x);
 static void oscbank_interpMs(t_oscbank *x, t_floatarg n);
 static void oscbank_nPartials(t_oscbank *x, t_floatarg n);
 static void oscbank_index(t_oscbank *x, t_floatarg in);
+static void oscbank_delta(t_oscbank *x, t_floatarg index, t_floatarg freq, t_floatarg amp);
 static void oscbank_table(t_oscbank *x, t_symbol *tablename);
 static void oscbank_print(t_oscbank *x);
 static void oscbank_outlist(t_oscbank *x);
@@ -61,14 +62,18 @@ static void oscbank_reset(t_oscbank *x);
 
 static void resize_partials(t_oscbank *x, int old, int new);
 
-inline static float wavetable_interp(float *wavetable, float lookup)
+inline static float wavetable_read(float *wavetable, float lookup)
 {
+#if defined(WAVETABLE_INTERP)
 	float frac, integral, f1, f2;
 	frac = modff(lookup, &integral);
 	wavetable += (int)integral;
 	f1 = wavetable[0];
 	f2 = wavetable[1];
 	return f1 + frac * (f2 - f1);
+#else
+	return wavetable[(int)lookup];
+#endif
 }
 
 // ------------------- Setup / Teardown ------------------------------
@@ -77,7 +82,8 @@ void oscbank_tilde_setup(void)
 {
 	oscbank_class = class_new(gensym("oscbank~"), (t_newmethod)oscbank_new, (t_method)oscbank_free,
 			sizeof(t_oscbank), 0, A_DEFFLOAT, 0);
-	class_addfloat(oscbank_class, oscbank_index);
+	class_addfloat(oscbank_class,  oscbank_index);
+	class_addmethod(oscbank_class, (t_method)oscbank_delta, gensym("delta"), A_FLOAT, A_FLOAT, A_FLOAT, 0 );
 	class_addmethod(oscbank_class, (t_method)oscbank_table, gensym("table"), A_SYMBOL);
 	class_addmethod(oscbank_class, (t_method)oscbank_interpMs, gensym("interp"), A_FLOAT, 0);
 	class_addmethod(oscbank_class, (t_method)oscbank_dsp, gensym("dsp"), (t_atomtype)0);
@@ -104,7 +110,7 @@ static void *oscbank_new(void)
 	// hardcoded samplerate prevents divide by zero in oscbank_index(), but will be updated when dsp is switched on
 	x->sampleRate = DEFAULT_SAMPLERATE;
 	x->sampleperiod = 1.0f / x->sampleRate;
-	oscbank_interpMs( x, DEFAULT_INTERP_MS);
+	oscbank_interpMs(x, DEFAULT_INTERP_MS);
 
 	x->got_a_table = 0;
 	x->nPartials = DEFAULT_NPARTIALS;
@@ -120,7 +126,6 @@ static void *oscbank_new(void)
 		sinewave[i] = sin(twopi * (float)i/ x->wavetablesize);
 	}
 	x->wavetable = &sinewave[0];
-	post("oscbank: new success.");
 	return (x);
 }
 
@@ -189,8 +194,8 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 	for(i = 0; i < x->nPartials; i++) {
 		t_partial *partial = x->pBank[i];
 		if(partial->index == iindex) {
-			if(partial->aCurr == 0) {
-				partial->aCurr = NEAR_ZERO;
+			if(partial->aCurr <= NEAR_ZERO) {
+				partial->aCurr = NEAR_ZERO; // enables synthesis if amp was zeroed out
 			}
 			partial->fIncr = (freq - partial->fCurr) * x->interp_incr;
 			partial->aIncr = (x->inamp - partial->aCurr) * x->interp_incr;
@@ -235,6 +240,26 @@ static void oscbank_index(t_oscbank *x, t_floatarg in)
 	partial->aIncr = x->inamp * x->interp_incr;
 }
 
+static void oscbank_delta(t_oscbank *x, t_floatarg index, t_floatarg freq, t_floatarg amp)
+{
+	int i, iindex;
+	iindex = (int)index;
+
+	for(i = 0; i < x->nPartials; i++) {
+		t_partial *partial = x->pBank[i];
+		if(partial->index == iindex) {
+			float newfreq = fabsf(partial->freq + freq);
+			float newamp = fabsf(partial->amp + amp);
+			partial->fIncr = (newfreq - partial->fCurr) * x->interp_incr;
+			partial->aIncr = (newamp - partial->aCurr) * x->interp_incr;
+			partial->freq = newfreq;
+			partial->amp = newamp;
+			partial->nInterp = x->interpSamples;
+			return;
+		}
+	}
+}
+
 static void oscbank_table(t_oscbank *x, t_symbol *tablename)
 {
 	if(!x->got_a_table) {
@@ -261,7 +286,7 @@ static void oscbank_print(t_oscbank *x)
 	for(i = 0; i < x->nPartials; i++) {
 		t_partial *partial = x->pBank[i];
 		if(partial->aCurr) {
-			post("%d: %d, %.2f, %.2f", i, partial->index, partial->fCurr,  partial->aCurr );
+			post("%d: %d, %.2f, %.2f", i, partial->index, partial->fCurr,  partial->aCurr);
 		}
 	}
 }
@@ -271,7 +296,6 @@ static void oscbank_outlist(t_oscbank *x)
 	int audiblePartials = 0;
 	if (!x->outv) {
 		x->outv = (t_atom *)malloc(x->nPartials * 3 * sizeof(t_atom));
-		post("sendout: allocated %d bytes", x->nPartials * 3 * sizeof(t_atom));
 	}
 	if(!x->outv) {
 		pd_error(x, "could not allocate memory for t_atom list");
@@ -317,7 +341,7 @@ static t_int *oscbank_perform(t_int *w)
 
 	for(i = 0; i < x->nPartials; i++) {
 		t_partial *partial = x->pBank[i];
-		if(partial->amp > NEAR_ZERO) {
+		if(partial->amp > NEAR_ZERO || partial->aCurr > 0.0f) {
 			for(sample = 0; sample < n; sample++) {
 				if(partial->nInterp > 0) {
 					partial->fCurr += partial->fIncr;
@@ -335,12 +359,7 @@ static t_int *oscbank_perform(t_int *w)
 				if(partial->phase >= 1.0f) {
 					partial->phase = fmodf(partial->phase, 1.0f);
 				}
-				
-#if defined (WAVETABLE_INTERP)
-				*(out+sample) += wavetable_interp(wavetable, wavetable_mul * partial->phase) * partial->aCurr;
-#else				
-				*(out+sample) += *(wavetable + (wavetable_mul * (int)partial->phase)) * partial->aCurr;
-#endif
+				*(out+sample) += wavetable_read(wavetable, wavetable_mul * partial->phase) * partial->aCurr;
 			}
 		}
 	}
